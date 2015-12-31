@@ -3,4 +3,40 @@ usage = "music_on_motion [--options] config.ini"
 description = "listens for motion through gpio and plays music when motion is detected"
 author = "Reed Essick"
 
+#=================================================
+
+import annoySalvo as ass
+
+import subprocess as sp
+from ConfigParser import SafeConfigParser
+from optparse import OptionParser
+
+#=================================================
+
+parser = OptionParser(usage=usage, description=description)
+
+parser.add_option('-v', '--verbose', default=False, action='store_true')
+
+opts, args = parser.parse_args()
+
+if len(args)!=1:
+    raise ValueError("Please supply exactly one config file as an input argument")
+
+#=================================================
+
+config = SafeConfigParser()
+if opts.verbose:
+    print "reading config from : %s"%args[0]
+config.read( args[0] )
+
+song = config.get('general', 'song')
+
+#=================================================
+
+cmd = ass.mplayer_cmd( song )
+if opts.verbose:
+    print cmd
+proc = sp.Popen(cmd.split())
+proc.wait()
+
 
