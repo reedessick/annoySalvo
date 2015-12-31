@@ -1,0 +1,6 @@
+#!/usr/bin/python
+usage = "music_on_motion [--options] config.ini"
+description = "listens for motion through gpio and plays music when motion is detected"
+author = "Reed Essick"
+
+
