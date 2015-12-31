@@ -7,6 +7,8 @@ author = "Reed Essick"
 
 import annoySalvo as ass
 
+import time
+import random
 import subprocess as sp
 from ConfigParser import SafeConfigParser
 from optparse import OptionParser
@@ -29,14 +31,36 @@ if opts.verbose:
     print "reading config from : %s"%args[0]
 config.read( args[0] )
 
+#========================
+
 song = config.get('general', 'song')
+random_delay = config.getfloat('general', 'random_delay')
+play_length = config.getfloat('general', 'play_length')
 
 #=================================================
 
+if opts.verbose:
+    print "setting up command"
 cmd = ass.mplayer_cmd( song )
 if opts.verbose:
-    print cmd
-proc = sp.Popen(cmd.split())
-proc.wait()
+    print "    %s"%(cmd)
 
+while True:
+    if ass.has_moved():
+
+        wait = random_delay*random.random()
+        if opts.verbose:
+            print "sleeping for %.3f sec"%(wait)
+        time.sleep( wait )
+
+        if opts.verbose:
+            print cmd
+        proc = sp.Popen(cmd.split())
+        time.sleep( play_length ) ### sleep for timeout
+        proc.kill()
+        proc.wait() ### make sure we clean up?
+
+        break ### only play once
+    else:
+        time.sleep(1) ### only check every second
 
