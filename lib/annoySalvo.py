@@ -1,6 +1,7 @@
 description = "a module for some basic tools used to annoy Salvo"
 author = "Reed Essick"
 
+import time
 #from RPi import GPIO as gpio
 
 #=================================================
@@ -20,3 +21,9 @@ def has_moved():
     WARNING: currently just returns True
     """
     return True
+
+def wait():
+    """
+    determines how long we have to wait until we're allowed to mess with Salvo
+    """
+    return 0

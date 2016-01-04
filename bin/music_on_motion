@@ -46,8 +46,11 @@ if opts.verbose:
     print "    %s"%(cmd)
 
 while True:
-    if ass.has_moved():
+    wait = ass.wait():
+    if wait > 0:
+        time.sleep( wait )
 
+    if ass.has_moved():
         wait = random_delay*random.random()
         if opts.verbose:
             print "sleeping for %.3f sec"%(wait)
