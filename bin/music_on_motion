@@ -31,7 +31,7 @@ def main(opts, args):
     pd_power = config.getint('gpio', 'pd_power')
     pd_input = config.getint('gpio', 'pd_input')
     wait_calibration = config.getfloat('gpio', 'wait_calibration')
-    sample_wait = 1.0/config.getfloat('gpio', 'sample_rate' )
+    wait_sample = 1.0/config.getfloat('gpio', 'sample_rate' )
 
     #=============================================
 
