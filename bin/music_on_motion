@@ -5,7 +5,114 @@ author = "Reed Essick"
 
 #=================================================
 
+def main(opts, args):
+    '''
+    wrapped into a function call so that we can exit gracefully
+    '''
+
+    config = SafeConfigParser()
+    if opts.verbose:
+        print "reading config from : %s"%args[0]
+    config.read( args[0] )
+
+    #========================
+
+    if config.has_option('general', 'logdir'):
+        logdir = config.get('general', 'logdir')
+    else:
+        logdir = None
+
+    song = config.get('music', 'song')
+    delay = config.getfloat('music', 'delay')
+    random_delay = config.getfloat('music', 'random_delay')
+    play_length = config.getfloat('music', 'play_length')
+    wait_after = config.getfloat('music', 'wait_after')
+
+    pd_power = config.getint('gpio', 'pd_power')
+    pd_input = config.getint('gpio', 'pd_input')
+    wait_calibration = config.getfloat('gpio', 'wait_calibration')
+    sample_wait = 1.0/config.getfloat('gpio', 'sample_rate' )
+
+    #=============================================
+
+    if opts.verbose:
+        print "setting up gpio :\n    pd_power pin=%d\n    pd_input pin=%d"%(pd_power, pd_input)
+    gpio.setup( pd_power, gpio.OUT, initial=0 ) ### set up with PD de-energized
+    gpio.setup( pd_input, gpio.IN, pull_up_down=gpio.PUD_DOWN ) ### set up input with pull down (off)
+                                                            ### this means we tend toward the off state when there is no input signal
+
+    #=============================================
+
+    if opts.verbose:
+        print "setting up command"
+    cmd = ass.mplayer_cmd( song )
+    if logdir:
+        out = "%s/mplayer.out"%(logdir)
+        err = "%s/mplayer.err"%(logdir)
+        out_obj = open( out, 'a' )
+        err_obj = open( err, 'a' )
+    else:
+        out = "stdout"
+        err = "stderr"
+        from sys import stdout as out_obj
+        from sys import stderr as err_obj 
+    if opts.verbose:
+        print "    %s 1>> %s 2>> %s"%(cmd, out, err)
+
+    #=================================================
+
+    if opts.verbose:
+        print "energizing ciruit!\nsleeping for %.3f seconds while sensor calibrates."%(wait_calibration)
+    gpio.output( pd_power, 1 ) ### energize the circuit
+    time.sleep( wait_calibration ) ### sleep while PD calibrates
+
+    if opts.verbose:
+        print "listening for motion through pin=%d"%(pd_input)
+    while True: ### main loop
+
+        ### determine how long we have to wait before we're allowed to annoy Salvo
+        wait = ass.wait()
+        if wait > 0:
+            time.sleep( wait )
+
+        ### check whether motion was detected
+        if ass.has_moved( pd_input, verbose=False ):
+
+            ### determine how long we wait before playing the song
+            wait = delay + random_delay*random.random()
+            if opts.verbose:
+                print "sleeping for %.3f sec before playing song"%(wait)
+            time.sleep( wait )
+
+            ### play the song
+            if opts.verbose:
+                print cmd
+            proc = sp.Popen(cmd.split(), stdout=out_obj, stderr=err_obj )
+
+            ### kill after playing for a play_length
+            if opts.verbose:
+                print "playing for %.3f sec"%(play_length)
+            time.sleep( play_length ) ### sleep for timeout
+            proc.kill()
+
+            ### sleep for some time before we start listening again
+            if opts.verbose:
+                print "sleeping for %.3f sec"%(wait_after)
+            time.sleep( wait_after )
+            if opts.verbose:
+                print "listening for motion through pin=%d"%(pd_input)
+
+            if opts.test: ### only play once when testing
+                break
+        else:
+            time.sleep( wait_sample ) ### only check every so often
+
+    gpio.output( pd_power, 0 ) ### de-energize the circuit
+
+#=================================================
+
 import annoySalvo as ass
+gpio = ass.gpio
 
 import time
 import random
@@ -18,6 +125,7 @@ from optparse import OptionParser
 parser = OptionParser(usage=usage, description=description)
 
 parser.add_option('-v', '--verbose', default=False, action='store_true')
+parser.add_option('-t', '--test', default=False, action='store_true', help='only play the song once, then exit')
 
 opts, args = parser.parse_args()
 
@@ -26,58 +134,7 @@ if len(args)!=1:
 
 #=================================================
 
-config = SafeConfigParser()
-if opts.verbose:
-    print "reading config from : %s"%args[0]
-config.read( args[0] )
-
-#========================
-
-song = config.get('general', 'song')
-delay = config.getfloat('general', 'delay')
-random_delay = config.getfloat('general', 'random_delay')
-play_length = config.getfloat('general', 'play_length')
-wait_after = config.getfloat('general', 'wait_after')
-
-pin = config.getint('gpio', 'pin')
-
-#=================================================
-
-if opts.verbose:
-    print "setting up gpio : pull-up pin=%d"%(pin)
-ass.GPIO.setup( pin, ass.GPIO.IN, pull_up_down=ass.GPIO.PUD_UP )
-
-#=================================================
-
-if opts.verbose:
-    print "setting up command"
-cmd = ass.mplayer_cmd( song )
-if opts.verbose:
-    print "    %s"%(cmd)
-
-#=================================================
-
-while True:
-    wait = ass.wait():
-    if wait > 0:
-        time.sleep( wait )
-
-    if ass.has_moved( pin ):
-        wait = random_delay*random.random()
-        if opts.verbose:
-            print "sleeping for %.3f sec"%(wait)
-        time.sleep( wait )
-
-        if opts.verbose:
-            print cmd
-        proc = sp.Popen(cmd.split())
-        time.sleep( play_length ) ### sleep for timeout
-        proc.kill()
-        proc.wait() ### make sure we clean up?
-
-        time.sleep( wait_after )
-
-        break ### only play once
-    else:
-        time.sleep(1) ### only check every second
-
+try:
+    main( opts, args ) ### execute main loop
+finally:
+    gpio.cleanup() ### clean up all GPIO assignments
