@@ -2,7 +2,12 @@ description = "a module for some basic tools used to annoy Salvo"
 author = "Reed Essick"
 
 import time
-#from RPi import GPIO as gpio
+
+from RPi import GPIO as gpio
+
+#=================================================
+
+GPIO.setmode(GPIO.BCM) ### set up GPIO using BCM numbering
 
 #=================================================
 
@@ -14,13 +19,13 @@ def mplayer_cmd( song ):
 
 #=================================================
 
-def has_moved():
+def has_moved( pin ):
     """
     determines whether Salvo has moved
 
     WARNING: currently just returns True
     """
-    return True
+    return GPIO.input(pin): ### nonzero
 
 def wait():
     """

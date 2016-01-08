@@ -34,8 +34,18 @@ config.read( args[0] )
 #========================
 
 song = config.get('general', 'song')
+delay = config.getfloat('general', 'delay')
 random_delay = config.getfloat('general', 'random_delay')
 play_length = config.getfloat('general', 'play_length')
+wait_after = config.getfloat('general', 'wait_after')
+
+pin = config.getint('gpio', 'pin')
+
+#=================================================
+
+if opts.verbose:
+    print "setting up gpio : pull-up pin=%d"%(pin)
+ass.GPIO.setup( pin, ass.GPIO.IN, pull_up_down=ass.GPIO.PUD_UP )
 
 #=================================================
 
@@ -45,12 +55,14 @@ cmd = ass.mplayer_cmd( song )
 if opts.verbose:
     print "    %s"%(cmd)
 
+#=================================================
+
 while True:
     wait = ass.wait():
     if wait > 0:
         time.sleep( wait )
 
-    if ass.has_moved():
+    if ass.has_moved( pin ):
         wait = random_delay*random.random()
         if opts.verbose:
             print "sleeping for %.3f sec"%(wait)
@@ -62,6 +74,8 @@ while True:
         time.sleep( play_length ) ### sleep for timeout
         proc.kill()
         proc.wait() ### make sure we clean up?
+
+        time.sleep( wait_after )
 
         break ### only play once
     else:
