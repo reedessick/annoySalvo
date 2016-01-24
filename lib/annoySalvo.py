@@ -11,11 +11,11 @@ gpio.setmode(gpio.BCM) ### set up GPIO using BCM numbering
 
 #=================================================
 
-def mplayer_cmd( song ):
+def mplayer_cmd( song, volume=100 ):
     """
     defines a command string to launch mplayer
     """
-    return "mplayer -noconsolecontrols %s"%(song)
+    return "mplayer %s -volume %.3f"%(song, volume)
 
 #=================================================
 

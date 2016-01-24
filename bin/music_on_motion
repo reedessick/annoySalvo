@@ -23,6 +23,11 @@ def main(opts, args):
         logdir = None
 
     song = config.get('music', 'song')
+    if config.has_option('music', 'volume'):
+        volume = config.getfloat('music', 'volume')
+    else:
+        volume = 50
+
     delay = config.getfloat('music', 'delay')
     random_delay = config.getfloat('music', 'random_delay')
     play_length = config.getfloat('music', 'play_length')
@@ -45,7 +50,7 @@ def main(opts, args):
 
     if opts.verbose:
         print "setting up command"
-    cmd = ass.mplayer_cmd( song )
+    cmd = ass.mplayer_cmd( song, volume=volume )
     if logdir:
         out = "%s/mplayer.out"%(logdir)
         err = "%s/mplayer.err"%(logdir)
