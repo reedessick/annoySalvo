@@ -98,7 +98,8 @@ def main(opts, args):
             if opts.verbose:
                 print "playing for %.3f sec"%(play_length)
             time.sleep( play_length ) ### sleep for timeout
-            proc.kill()
+            proc.terminate()
+            proc.wait() ### cleans up defunct process
 
             ### sleep for some time before we start listening again
             if opts.verbose:
@@ -132,6 +133,8 @@ parser = OptionParser(usage=usage, description=description)
 parser.add_option('-v', '--verbose', default=False, action='store_true')
 parser.add_option('-t', '--test', default=False, action='store_true', help='only play the song once, then exit')
 
+parser.add_option('-k', '--lock-file', default=None, type='string', help='will exit if this file already exists. Otherwise creates it and cleans up on nominal exit.')
+
 opts, args = parser.parse_args()
 
 if len(args)!=1:
@@ -140,6 +143,19 @@ if len(args)!=1:
 #=================================================
 
 try:
+    if opts.lock_file:
+        if opts.verbose:
+            print "creating lockfile : %s"%(opts.lock_file)
+        import os
+        if os.path.exists(opts.lock_file):
+            raise ValueError("lock-file : %s already exits!"%(opts.lock_file))
+        else:
+            open(opts.lock_file, "w").close() ### touch the file
     main( opts, args ) ### execute main loop
 finally:
     gpio.cleanup() ### clean up all GPIO assignments
+    if opts.lock_file:
+        ### remove lock-file (which should always exist)
+        if opts.verbose:
+            print "deleting lockfile : %s"%(opts.lock_file)
+        os.remove( opts.lock_file ) 
