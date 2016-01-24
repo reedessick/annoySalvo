@@ -64,16 +64,23 @@ def main(opts, args):
         from sys import stderr as err_obj 
     if opts.verbose:
         print "    %s 1>> %s 2>> %s"%(cmd, out, err)
+        sys.stdout.flush()
+        sys.stderr.flush()
 
     #=================================================
 
     if opts.verbose:
         print "energizing ciruit!\nsleeping for %.3f seconds while sensor calibrates."%(wait_calibration)
+        sys.stdout.flush()
+        sys.stderr.flush()
+
     gpio.output( pd_power, 1 ) ### energize the circuit
     time.sleep( wait_calibration ) ### sleep while PD calibrates
 
     if opts.verbose:
         print "listening for motion through pin=%d"%(pd_input)
+        sys.stdout.flush()
+        sys.stderr.flush()
 
     global proc
     proc = None ### variable declaration here for pausing functionality
@@ -92,6 +99,9 @@ def main(opts, args):
             wait = delay + random_delay*random.random()
             if opts.verbose:
                 print "sleeping for %.3f sec before playing song"%(wait)
+
+                sys.stdout.flush()
+
             time.sleep( wait )
 
             ### play the song
@@ -102,11 +112,19 @@ def main(opts, args):
                     print "restarting..."
                 proc.send_signal(signal.SIGCONT)
             else:
-                proc = sp.Popen(cmd.split(), stdout=out_obj, stderr=err_obj )
-            
+                devnull = open(os.devnull, "w")
+                proc = sp.Popen(cmd.split(), stdin=devnull, stdout=out_obj, stderr=err_obj )
+                devnull.close()
+
+            if opts.verbose:
+                sys.stdout.flush()
+
             ### stop after playing for a play_length
             if opts.verbose:
                 print "playing for %.3f sec"%(play_length)
+
+                sys.stdout.flush()
+
             time.sleep( play_length ) ### sleep for timeout
             if pause:
                 proc.send_signal(signal.SIGSTOP)
@@ -122,17 +140,27 @@ def main(opts, args):
                 proc.wait() ### cleans up defunct process
                 proc = None
 
+            if opts.verbose:
+                sys.stdout.flush()
+
             ### sleep for some time before we start listening again
             if opts.verbose:
                 print "sleeping for %.3f sec"%(wait_after)
+                sys.stdout.flush()
+
             time.sleep( wait_after )
             if opts.verbose:
                 print "listening for motion through pin=%d"%(pd_input)
+                sys.stdout.flush()
 
             if opts.test: ### only play once when testing
                 break
         else:
             time.sleep( wait_sample ) ### only check every so often
+
+        if opts.verbose:
+            sys.stdout.flush()
+            sys.stderr.flush()
 
     gpio.output( pd_power, 0 ) ### de-energize the circuit
 
@@ -144,6 +172,8 @@ gpio = ass.gpio
 import time
 import random
 
+import os
+import sys
 import signal
 import subprocess as sp
 
@@ -157,7 +187,7 @@ parser = OptionParser(usage=usage, description=description)
 parser.add_option('-v', '--verbose', default=False, action='store_true')
 parser.add_option('-t', '--test', default=False, action='store_true', help='only play the song once, then exit')
 
-parser.add_option('-k', '--lock-file', default=None, type='string', help='will exit if this file already exists. Otherwise creates it and cleans up on nominal exit.')
+parser.add_option('-k', '--lock-file', default='.music_on_motion.lock', type='string', help='will exit if this file already exists. Otherwise creates it and cleans up on nominal exit.')
 
 opts, args = parser.parse_args()
 
@@ -166,20 +196,29 @@ if len(args)!=1:
 
 #=================================================
 
+if opts.lock_file:
+    if opts.verbose:
+        print "creating lockfile : %s"%(opts.lock_file)
+    if os.path.exists(opts.lock_file):
+        raise ValueError("lock-file : %s already exits!"%(opts.lock_file))
+    else:
+        open(opts.lock_file, "w").close() ### touch the file
+
 try: ### wrap main execution in a try/except loop to gracefully exit and clean-up gpio
-    if opts.lock_file:
-        if opts.verbose:
-            print "creating lockfile : %s"%(opts.lock_file)
-        import os
-        if os.path.exists(opts.lock_file):
-            raise ValueError("lock-file : %s already exits!"%(opts.lock_file))
-        else:
-            open(opts.lock_file, "w").close() ### touch the file
     main( opts, args ) ### execute main loop
+
+except Exception as e:
+    import traceback
+    traceback.print_exception()
+
 finally:
     try: ### clean up proc if it exits
         proc.terminate()
         proc.wait()
+
+    except NameError:
+        pass
+
     finally:
         gpio.cleanup() ### clean up all GPIO assignments
         if opts.lock_file:
