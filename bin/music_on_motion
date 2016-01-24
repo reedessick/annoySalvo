@@ -27,7 +27,8 @@ def main(opts, args):
         volume = config.getfloat('music', 'volume')
     else:
         volume = 50
-
+    pause = config.has_option('music', 'pause')
+    
     delay = config.getfloat('music', 'delay')
     random_delay = config.getfloat('music', 'random_delay')
     play_length = config.getfloat('music', 'play_length')
@@ -73,6 +74,10 @@ def main(opts, args):
 
     if opts.verbose:
         print "listening for motion through pin=%d"%(pd_input)
+
+    global proc
+    proc = None ### variable declaration here for pausing functionality
+
     while True: ### main loop
 
         ### determine how long we have to wait before we're allowed to annoy Salvo
@@ -92,14 +97,30 @@ def main(opts, args):
             ### play the song
             if opts.verbose:
                 print cmd
-            proc = sp.Popen(cmd.split(), stdout=out_obj, stderr=err_obj )
-
-            ### kill after playing for a play_length
+            if pause and (proc):
+                if opts.verbose:
+                    print "restarting..."
+                proc.send_signal(signal.SIGCONT)
+            else:
+                proc = sp.Popen(cmd.split(), stdout=out_obj, stderr=err_obj )
+            
+            ### stop after playing for a play_length
             if opts.verbose:
                 print "playing for %.3f sec"%(play_length)
             time.sleep( play_length ) ### sleep for timeout
-            proc.terminate()
-            proc.wait() ### cleans up defunct process
+            if pause:
+                proc.send_signal(signal.SIGSTOP)
+                if opts.verbose:
+                    print "pausing..."
+                if (proc.poll()!=None): ### proc already finished, so we clean up
+                    if opts.verbose:
+                        print "    proc already finished! cleaning up"
+                    proc.wait()
+                    proc = None
+            else:
+                proc.terminate()
+                proc.wait() ### cleans up defunct process
+                proc = None
 
             ### sleep for some time before we start listening again
             if opts.verbose:
@@ -122,7 +143,10 @@ gpio = ass.gpio
 
 import time
 import random
+
+import signal
 import subprocess as sp
+
 from ConfigParser import SafeConfigParser
 from optparse import OptionParser
 
@@ -142,7 +166,7 @@ if len(args)!=1:
 
 #=================================================
 
-try:
+try: ### wrap main execution in a try/except loop to gracefully exit and clean-up gpio
     if opts.lock_file:
         if opts.verbose:
             print "creating lockfile : %s"%(opts.lock_file)
@@ -153,9 +177,13 @@ try:
             open(opts.lock_file, "w").close() ### touch the file
     main( opts, args ) ### execute main loop
 finally:
-    gpio.cleanup() ### clean up all GPIO assignments
-    if opts.lock_file:
-        ### remove lock-file (which should always exist)
-        if opts.verbose:
-            print "deleting lockfile : %s"%(opts.lock_file)
-        os.remove( opts.lock_file ) 
+    try: ### clean up proc if it exits
+        proc.terminate()
+        proc.wait()
+    finally:
+        gpio.cleanup() ### clean up all GPIO assignments
+        if opts.lock_file:
+            ### remove lock-file (which should always exist)
+            if opts.verbose:
+                print "deleting lockfile : %s"%(opts.lock_file)
+            os.remove( opts.lock_file ) 
